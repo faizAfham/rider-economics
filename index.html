@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Swish Go: Rs 0 fee model</title>
+<style>
+  :root { --ink:#212529; --muted:#6c757d; --line:#dee2e6; --soft:#f8f9fa; --go:#d9480f; --band:#e9ecef; --bg:#fff; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink:#e9ecef; --muted:#adb5bd; --line:#343a40; --soft:#1e2125; --band:#2b2f34; --bg:#141619; }
+  }
+  * { box-sizing: border-box; }
+  body { font: 15px/1.5 Arial, Helvetica, sans-serif; color: var(--ink); background: var(--bg); margin: 0; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 40px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .by { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 680px) { .grid { grid-template-columns: 1fr; } }
+  label { display: block; font-size: 13px; margin: 12px 0 2px; }
+  label b { float: right; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: var(--go); }
+  .hint { color: var(--muted); font-size: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  td { padding: 6px 0; border-bottom: 1px solid var(--line); }
+  td:last-child { white-space: nowrap; padding-left: 12px; text-align: right; font-variant-numeric: tabular-nums; font-weight: bold; }
+  .neg { color: var(--go); }
+  svg { width: 100%; height: auto; display: block; margin-top: 8px; }
+  svg text { fill: var(--muted); font: 11px Arial, sans-serif; }
+  h2 { font-size: 15px; margin: 28px 0 6px; }
+  .ref td:last-child { font-weight: normal; }
+  a { color: inherit; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Swish Go: what a Rs 0 fee order needs</h1>
+  <div class="by">Mohammad Faiz Ahmad &middot; companion to the memo "Who pays for the rider?" &middot; Oct 2026. Defaults come from public filings; the sliders are assumptions.</div>
+
+  <div class="grid">
+    <div>
+      <label>Basket (food value) <b id="aov_v"></b></label>
+      <input id="aov" type="range" min="150" max="600" step="5" value="225">
+      <div class="hint">Swish's own kitchens: Rs 200&ndash;250 (Mar 2026). Go's basket isn't public.</div>
+      <label>Rider cost per order <b id="rider_v"></b></label>
+      <input id="rider" type="range" min="15" max="80" step="1" value="40">
+      <div class="hint">Assumption. Ownly charges a flat Rs 30 for a delivery.</div>
+      <label>Commission Go charges <b id="com_v"></b></label>
+      <input id="com" type="range" min="0" max="35" step="0.5" value="15">
+      <div class="hint">Restaurants say aggregators charge 8&ndash;28% (BBHA, Jul 2026).</div>
+      <label>Payments, share of order <b id="pay_v"></b></label>
+      <input id="pay" type="range" min="0" max="3" step="0.1" value="1.5">
+      <label>Refunds + support, share of order <b id="sup_v"></b></label>
+      <input id="sup" type="range" min="0" max="5" step="0.1" value="2">
+      <label>Go orders per month <b id="vol_v"></b></label>
+      <input id="vol" type="range" min="50000" max="3000000" step="50000" value="1000000">
+      <div class="hint">All of Swish today: 1M+ a month (Sep 2026).</div>
+    </div>
+    <div>
+      <table>
+        <tr><td>Break-even commission</td><td id="be"></td></tr>
+        <tr><td>Per order at your commission</td><td id="po"></td></tr>
+        <tr><td>Per month at your volume</td><td id="pm"></td></tr>
+        <tr><td>Per year, as a share of the Rs 224.5 cr Sep 2026 raise</td><td id="py"></td></tr>
+        <tr><td>Go revenue per order vs Ownly's Rs 30</td><td id="rev"></td></tr>
+      </table>
+      <svg id="chart" viewBox="0 0 400 230" role="img" aria-label="Break-even commission by basket size"></svg>
+      <div class="hint">Break-even commission by basket at your rider cost. The shaded band is the 8&ndash;28% restaurants say they pay today. The dot is your basket.</div>
+    </div>
+  </div>
+
+  <h2>Reference points (Q1 FY27, quarter ended 30 Jun 2026)</h2>
+  <table class="ref">
+    <tr><td>Swiggy food delivery: revenue / contribution, % of GOV</td><td>26.0% / 7.6%</td></tr>
+    <tr><td>Eternal food delivery: revenue / contribution, % of NOV</td><td>32.8% / 10.2%</td></tr>
+    <tr><td>Platform fee per order, Swiggy and Zomato (Mar 2026)</td><td>Rs 17.58</td></tr>
+    <tr><td>Rapido Ownly: customer fee / restaurant commission</td><td>Rs 30 / 0</td></tr>
+  </table>
+  <p class="hint">Formula: break-even commission = rider &divide; basket + payments + refunds. Leaves out marketing, tech and kitchens, so it is a floor. Sources: Swiggy and Eternal shareholder letters, Storyboard18, MediaNama, Inc42, The Week.</p>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const ids = ["aov", "rider", "com", "pay", "sup", "vol"];
+const rs = v => (v < 0 ? "-" : "") + "Rs " + Math.abs(v).toLocaleString("en-IN", { maximumFractionDigits: 1 });
+const cr = v => (v < 0 ? "-" : "") + "Rs " + Math.abs(v / 1e7).toFixed(2) + " cr";
+
+function draw(rider, extra, aov) {
+  const W = 400, H = 230, L = 34, B = 24, T = 8, xs = a => L + (a - 150) / 450 * (W - L - 8),
+        ys = c => H - B - Math.min(c, 0.5) / 0.5 * (H - B - T);
+  let s = `<rect x="${L}" y="${ys(.28)}" width="${W - L - 8}" height="${ys(.08) - ys(.28)}" fill="var(--band)"/>`;
+  for (const c of [0, .1, .2, .3, .4, .5]) s += `<text x="${L - 4}" y="${ys(c) + 4}" text-anchor="end">${c * 100}%</text>`;
+  for (const a of [150, 300, 450, 600]) s += `<text x="${xs(a)}" y="${H - 6}" text-anchor="${a === 600 ? "end" : "middle"}">Rs ${a}</text>`;
+  let d = "";
+  for (let a = 150; a <= 600; a += 5) d += (a === 150 ? "M" : "L") + xs(a).toFixed(1) + " " + ys(rider / a + extra).toFixed(1);
+  s += `<path d="${d}" fill="none" stroke="var(--go)" stroke-width="2"/>`;
+  s += `<circle cx="${xs(aov)}" cy="${ys(rider / aov + extra)}" r="4.5" fill="var(--go)"/>`;
+  $("chart").innerHTML = s;
+}
+
+function update() {
+  const v = Object.fromEntries(ids.map(i => [i, +$(i).value]));
+  const extra = (v.pay + v.sup) / 100, com = v.com / 100;
+  const be = v.rider / v.aov + extra;
+  const po = com * v.aov - v.rider - extra * v.aov;
+  $("aov_v").textContent = rs(v.aov); $("rider_v").textContent = rs(v.rider);
+  $("com_v").textContent = v.com + "%"; $("pay_v").textContent = v.pay + "%"; $("sup_v").textContent = v.sup + "%";
+  $("vol_v").textContent = (v.vol / 1e5).toFixed(1) + " lakh";
+  $("be").textContent = (be * 100).toFixed(1) + "%";
+  $("po").textContent = rs(po); $("pm").textContent = cr(po * v.vol);
+  $("py").textContent = (po * v.vol * 12 / 224.54e7 * 100).toFixed(1) + "%";
+  $("rev").textContent = rs(com * v.aov);
+  for (const i of ["po", "pm", "py"]) $(i).className = po < 0 ? "neg" : "";
+  draw(v.rider, extra, v.aov);
+}
+ids.forEach(i => $(i).addEventListener("input", update));
+update();
+</script>
+</body>
+</html>
